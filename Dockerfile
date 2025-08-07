@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     cmake \
     libglib2.0-0 \
+    git \
+    wget \
     # other system dependencies from cog.yaml if any were missed (libgl1 is listed)
  && rm -rf /var/lib/apt/lists/*
 
@@ -48,15 +50,27 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt hf_transfer
 RUN pip install huggingface_hub --quiet
 
+# 创建MODNet模型目录（模型将在运行时下载）
+RUN mkdir -p /app/checkpoints/modnet
+
+# 下载MODNet源码和模型
+RUN git clone https://github.com/ZHKKKe/MODNet.git /tmp/modnet && \
+    cp -r /tmp/modnet/src /app/modnet_src && \
+    rm -rf /tmp/modnet
+    
+# 下载MODNet模型（人像抠图专用）
+RUN pget https://huggingface.co/DavG25/modnet-pretrained-models/resolve/main/models/modnet_photographic_portrait_matting.ckpt /app/checkpoints/modnet/modnet_photographic_portrait_matting.ckpt || \
+    curl -L https://huggingface.co/DavG25/modnet-pretrained-models/resolve/main/models/modnet_photographic_portrait_matting.ckpt -o /app/checkpoints/modnet/modnet_photographic_portrait_matting.ckpt
+
 # 8. Copy Project Files
 COPY . .
 
-# 9. Expose Port (Good practice, RunPod might manage ports differently)
-EXPOSE 8080
+# 9. Download checkpoints
+RUN huggingface-cli download ByteDance/LatentSync-1.6 whisper/tiny.pt --local-dir checkpoints
+RUN huggingface-cli download ByteDance/LatentSync-1.6 latentsync_unet.pt --local-dir checkpoints
 
-# Make setup_env.sh executable and run it
-RUN chmod +x setup_env.sh
-RUN ./setup_env.sh
+# 10. Expose Port (Good practice, RunPod might manage ports differently)
+EXPOSE 8080
 
 # 10. Command to start the RunPod worker
 # This assumes 'runpod_handler.py' contains a function 'handler'

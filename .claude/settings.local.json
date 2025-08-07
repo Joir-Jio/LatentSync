@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(docker stop:*)",
+      "Bash(winpty docker run:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(ls:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker rm:*)",
+      "Bash(curl:*)",
+      "Bash(docker tag:*)",
+      "Bash(docker push:*)",
+      "Bash(jobs)",
+      "Bash(git add:*)"
+    ],
+    "deny": []
+  }
+}

@@ -40,27 +40,25 @@ def get_gcs_client():
 def download_file(url, destination_dir):
     """Downloads a file from a URL to a specified directory using pget."""
     print(f"Downloading {url} to {destination_dir}")
-    # Ensure pget is available or handle potential errors
+    
+    # Extract a clean filename from URL (remove query parameters)
+    from urllib.parse import urlparse
+    parsed_url = urlparse(url)
+    clean_filename = os.path.basename(parsed_url.path)
+    if not clean_filename or clean_filename == '/':
+        clean_filename = "downloaded_file"
+    
+    filename = os.path.join(destination_dir, clean_filename)
+    
     try:
-        # Using pget for potentially faster downloads, similar to cog.yaml
-        # pget automatically extracts if it's a tar archive, we might need to adjust if it's just a raw file
-        # For simple file download, ensure pget doesn't try to extract.
-        # The -x flag in cog.yaml is for extraction. We might not need it if downloading raw video/audio.
-        # However, pget might be smart enough. If not, might need to use curl or requests.
-        # Let's assume pget handles direct file downloads correctly or we can adjust command.
-        # Create a unique filename within the destination directory
-        filename = os.path.join(destination_dir, os.path.basename(url))
-        subprocess.check_call(["pget", url, filename], close_fds=False) # Simpler pget command for single file
+        subprocess.check_call(["pget", url, filename], close_fds=False)
         print(f"Successfully downloaded {url} to {filename}")
         return filename
     except subprocess.CalledProcessError as e:
         print(f"Error downloading {url}: {e}")
         raise
-
-    
     except FileNotFoundError:
         print("Error: pget command not found. Ensure it is installed and in PATH.")
-        # Fallback or error
         raise Exception("pget not found. Cannot download files.")
 
 
@@ -78,10 +76,11 @@ def handler(event):
     if not video_url or not audio_url:
         return {"error": "video_url and audio_url are required."}
 
-    # Parameters for the model, with defaults matching predict.py if not provided
+# Parameters for the model, with defaults matching predict.py if not provided
     guidance_scale = float(job_input.get('guidance_scale', 2.0))
     inference_steps = int(job_input.get('inference_steps', 20))
     seed = int(job_input.get('seed', 0)) # 0 for random seed as per predict.py
+    remove_background = bool(job_input.get('remove_background', False))
 
     # Initialize predictor if not already done
     if predictor_instance is None:
@@ -119,7 +118,8 @@ def handler(event):
                 audio=local_audio_path, # predict.py expects string paths
                 guidance_scale=guidance_scale,
                 inference_steps=inference_steps,
-                seed=seed
+                seed=seed,
+                remove_background=remove_background
             )
             
             output_path_str = str(output_path_object) # Convert Path object to string
@@ -138,12 +138,15 @@ def handler(event):
                 bucket = client.bucket(bucket_name)
 
                 prefix = os.getenv("GCS_UPLOAD_PREFIX", "videos/")
-                unique_filename = f"{uuid.uuid4()}.mp4"
+# MODNet使用MP4格式，文件更小
+                file_extension = "mp4"
+                content_type = "video/mp4"
+                unique_filename = f"{uuid.uuid4()}.{file_extension}"
                 blob_path = f"{prefix}{unique_filename}"
                 blob = bucket.blob(blob_path)
 
                 print(f"HANDLER: Uploading to gs://{bucket_name}/{blob_path} ...")
-                blob.upload_from_filename(local_file_path, content_type="video/mp4")
+                blob.upload_from_filename(local_file_path, content_type=content_type)
 
                 public_url = f"https://storage.googleapis.com/{bucket_name}/{blob_path}"
                 print(f"HANDLER: Upload success. Public URL: {public_url}")

@@ -99,6 +99,35 @@ def main(config, args):
         mask_image_path=config.data.mask_image_path,
         temp_dir=args.temp_dir,
     )
+    
+    final_output_path = args.video_out_path
+    
+    if args.remove_background:
+        print("[BACKGROUND REMOVAL] Background removal requested...")
+        import sys
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from modnet_bg_removal import remove_background_modnet
+        
+        background_removed_path = args.video_out_path.replace('.mp4', '_no_bg.mp4')
+        print(f"[BACKGROUND REMOVAL] Starting background removal...")
+        print(f"[BACKGROUND REMOVAL] Input: {args.video_out_path}")
+        print(f"[BACKGROUND REMOVAL] Output: {background_removed_path}")
+        
+        try:
+            remove_background_modnet(args.video_out_path, background_removed_path, transparent=False)
+            print(f"[BACKGROUND REMOVAL] Background removed successfully: {background_removed_path}")
+            # 更新最终输出路径为去背景后的文件
+            final_output_path = background_removed_path
+            print(f"[BACKGROUND REMOVAL] Final output path updated to: {final_output_path}")
+        except Exception as e:
+            print(f"[BACKGROUND REMOVAL] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            print("[BACKGROUND REMOVAL] Continuing with original video...")
+    else:
+        print("[BACKGROUND REMOVAL] Background removal not requested.")
+    
+    return final_output_path
 
 
 if __name__ == "__main__":
@@ -113,6 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--temp_dir", type=str, default="temp")
     parser.add_argument("--seed", type=int, default=1247)
     parser.add_argument("--enable_deepcache", action="store_true")
+    parser.add_argument("--remove_background", action="store_true", help="Remove background after processing")
     args = parser.parse_args()
 
     config = OmegaConf.load(args.unet_config_path)

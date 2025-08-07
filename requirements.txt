@@ -29,3 +29,6 @@ boto3
 cog
 requests
 google-cloud-storage==3.2.0
+# MODNet依赖 - 手动安装避免git问题
+opencv-python==4.9.0.80
+Pillow==10.2.0

@@ -38,6 +38,7 @@ class Predictor(BasePredictor):
         guidance_scale: float = Input(description="Guidance scale", ge=1, le=3, default=2.0),
         inference_steps: int = Input(description="Inference steps", ge=20, le=50, default=20),
         seed: int = Input(description="Set to 0 for Random seed", default=0),
+        remove_background: bool = Input(description="Remove background from final video", default=False),
     ) -> Path:
         """Run a single prediction on the model"""
         if seed <= 0:
@@ -50,8 +51,33 @@ class Predictor(BasePredictor):
         ckpt_path = "checkpoints/latentsync_unet.pt"
         output_path = "/tmp/video_out.mp4"
 
-        # Run the following command:
-        os.system(
-            f"python -m scripts.inference --unet_config_path {config_path} --inference_ckpt_path {ckpt_path} --guidance_scale {str(guidance_scale)} --video_path {video_path} --audio_path {audio_path} --video_out_path {output_path} --seed {seed} --inference_steps {inference_steps}"
+        # Use scripts.inference directly to get the correct return path
+        from scripts.inference import main
+        from omegaconf import OmegaConf
+        import argparse
+        
+        # Load config
+        config = OmegaConf.load(config_path)
+        config["run"].update({
+            "guidance_scale": guidance_scale,
+            "inference_steps": inference_steps,
+        })
+        
+        # Create arguments object
+        args = argparse.Namespace(
+            inference_ckpt_path=ckpt_path,
+            video_path=video_path,
+            audio_path=audio_path,
+            video_out_path=output_path,
+            inference_steps=inference_steps,
+            guidance_scale=guidance_scale,
+            temp_dir="temp",
+            seed=seed,
+            enable_deepcache=False,
+            remove_background=remove_background
         )
-        return Path(output_path)
+        
+        print(f"Running inference with remove_background={remove_background}")
+        final_output_path = main(config=config, args=args)
+        
+        return Path(final_output_path)

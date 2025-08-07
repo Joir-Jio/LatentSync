@@ -15,6 +15,7 @@ def process_video(
     guidance_scale,
     inference_steps,
     seed,
+    remove_background,
 ):
     # Create the temp directory if it doesn't exist
     output_dir = Path("./temp")
@@ -39,7 +40,7 @@ def process_video(
     )
 
     # Parse the arguments
-    args = create_args(video_path, audio_path, output_path, inference_steps, guidance_scale, seed)
+    args = create_args(video_path, audio_path, output_path, inference_steps, guidance_scale, seed, remove_background)
 
     try:
         result = main(
@@ -47,14 +48,15 @@ def process_video(
             args=args,
         )
         print("Processing completed successfully.")
-        return output_path  # Ensure the output path is returned
+        # Return the actual output path (could be background-removed version)
+        return result if result else output_path
     except Exception as e:
         print(f"Error during processing: {str(e)}")
         raise gr.Error(f"Error during processing: {str(e)}")
 
 
 def create_args(
-    video_path: str, audio_path: str, output_path: str, inference_steps: int, guidance_scale: float, seed: int
+    video_path: str, audio_path: str, output_path: str, inference_steps: int, guidance_scale: float, seed: int, remove_background: bool
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference_ckpt_path", type=str, required=True)
@@ -66,6 +68,7 @@ def create_args(
     parser.add_argument("--temp_dir", type=str, default="temp")
     parser.add_argument("--seed", type=int, default=1247)
     parser.add_argument("--enable_deepcache", action="store_true")
+    parser.add_argument("--remove_background", action="store_true")
 
     return parser.parse_args(
         [
@@ -87,6 +90,7 @@ def create_args(
             "temp",
             "--enable_deepcache",
         ]
+        + (["--remove_background"] if remove_background else [])
     )
 
 
@@ -124,6 +128,7 @@ with gr.Blocks(title="LatentSync demo") as demo:
 
             with gr.Row():
                 seed = gr.Number(value=1247, label="Random Seed", precision=0)
+                remove_background = gr.Checkbox(label="Remove Background", value=False)
 
             process_btn = gr.Button("Process Video")
 
@@ -147,9 +152,10 @@ with gr.Blocks(title="LatentSync demo") as demo:
             guidance_scale,
             inference_steps,
             seed,
+            remove_background,
         ],
         outputs=video_output,
     )
 
 if __name__ == "__main__":
-    demo.launch(inbrowser=True, share=True)
+    demo.launch(server_name="0.0.0.0", server_port=7860, inbrowser=False, share=False)
